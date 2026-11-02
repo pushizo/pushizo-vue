@@ -13,17 +13,6 @@
 
 **Pushizo for Vue** — Vue plugin for the Pushizo Web SDK. app.use(PushizoPlugin, options) initializes the shared SDK once in the browser (SSR safe); the usePushizo composable exposes reactive permission and push subscription state, and $pushizo is available in every component. Works with Vue 3 and Vue 2.7.
 
-> **Status:** @pushizo/vue 0.1.0 is not on npm yet; until then you can install the release archive from this repository.<br>
-> **Durum:** @pushizo/vue 0.1.0 henüz npm'de değil; o zamana kadar bu deponun sürüm arşivinden kurabilirsiniz.
-
-**Install from GitHub until then · O zamana kadar GitHub'dan kurulum:**
-
-```bash
-npm install @pushizo/web --allow-remote=root https://github.com/pushizo/pushizo-vue/releases/download/v0.1.0/pushizo-vue-0.1.0.tgz
-```
-
-**After publication · Yayından sonra:**
-
 ```bash
 npm install @pushizo/vue @pushizo/web
 ```
