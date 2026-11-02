@@ -1,0 +1,58 @@
+{
+  "name": "@pushizo/vue",
+  "version": "0.1.0",
+  "description": "Pushizo Vue eklentisi: PushizoPlugin, usePushizo composable, $pushizo ve reaktif izin/abonelik durumu (Vue 3 ve 2.7; @pushizo/web üzerine)",
+  "license": "MIT",
+  "homepage": "https://docs.pushizo.com/docs/integrations/vue",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pushizo/pushizo-vue.git"
+  },
+  "bugs": {
+    "url": "https://github.com/pushizo/pushizo-vue/issues",
+    "email": "support@pushizo.com"
+  },
+  "keywords": [
+    "pushizo",
+    "vue",
+    "vue3",
+    "nuxt",
+    "push",
+    "notifications",
+    "web-push"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "peerDependencies": {
+    "@pushizo/web": "^0.1.0",
+    "vue": "^2.7.0 || ^3.2.0"
+  },
+  "devDependencies": {
+    "@pushizo/web": "^0.1.0",
+    "happy-dom": "^21.0.4",
+    "vue": "^3.5.0"
+  },
+  "sideEffects": false
+}
