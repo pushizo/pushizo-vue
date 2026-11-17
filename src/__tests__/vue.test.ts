@@ -1,11 +1,23 @@
 // @vitest-environment happy-dom
-import { createApp, defineComponent, effectScope, h, nextTick, type Component } from 'vue';
+import { createApp, defineComponent, effectScope, h, nextTick, ref, type Component } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as web from '@pushizo/web';
 import { getBinding, resetBinding } from '../binding.js';
-import { onNotificationClick, PushizoPlugin, usePushizo, type UsePushizo } from '../index.js';
+import {
+  onNotificationClick,
+  onNotificationForeground,
+  PushizoPlugin,
+  useContentCards,
+  useFeatureFlag,
+  useFeatureFlagValue,
+  useInboxUnreadCount,
+  usePushizo,
+  usePushizoSearch,
+  type UsePushizo,
+  type UsePushizoSearch,
+} from '../index.js';
 import { resetState } from '../state.js';
-import { CLICK, type FakeSdk } from './fake-sdk.js';
+import { CLICK, FOREGROUND, searchResponse, type FakeSdk } from './fake-sdk.js';
 
 vi.mock('@pushizo/web', async () => {
   const { createFakeSdk } = await import('./fake-sdk.js');
@@ -125,6 +137,144 @@ describe('@pushizo/vue (Vue 3)', () => {
     expect(fake.counts().click).toBe(1);
     scope.stop();
     expect(fake.counts().click).toBe(0);
+  });
+
+  it('onNotificationForeground kapsam durunca removeForegroundLifecycleListener ile kaldırılır', () => {
+    const onForeground = vi.fn();
+    const scope = effectScope();
+    scope.run(() => onNotificationForeground(onForeground));
+    expect(fake.extraCounts().foreground).toBe(1);
+    fake.foreground(FOREGROUND);
+    expect(onForeground).toHaveBeenCalledWith(FOREGROUND);
+    scope.stop();
+    expect(fake.extraCounts().foreground).toBe(0);
+    expect(fake.sdk.Notifications.removeForegroundLifecycleListener).toHaveBeenCalledWith(
+      onForeground,
+    );
+  });
+
+  it('useFeatureFlag bayrak yenilenince güncellenir; gözlemci removeObserver ile temizlenir', async () => {
+    const { app, el } = mount(
+      defineComponent({
+        setup() {
+          const enabled = useFeatureFlag('new_checkout');
+          const limit = useFeatureFlagValue<number>('limit', 5);
+          return () => h('span', `${enabled.value}:${limit.value}`);
+        },
+      }),
+    );
+    await flush();
+    await nextTick();
+    expect(el.textContent).toBe('false:5');
+    expect(fake.extraCounts().flags).toBe(2);
+    fake.setFlags({ new_checkout: { enabled: true }, limit: { enabled: true, value: 20 } });
+    await nextTick();
+    expect(el.textContent).toBe('true:20');
+    app.unmount();
+    expect(fake.extraCounts().flags).toBe(0);
+    expect(fake.sdk.FeatureFlags.removeObserver).toHaveBeenCalledTimes(2);
+  });
+
+  it('useInboxUnreadCount ilk değeri okur, kutu olaylarıyla güncellenir ve gözlemciyi kaldırır', async () => {
+    fake.setUnread(3);
+    const { app, el } = mount(
+      defineComponent({
+        setup() {
+          const count = useInboxUnreadCount();
+          return () => h('span', String(count.value));
+        },
+      }),
+    );
+    await flush();
+    await nextTick();
+    expect(el.textContent).toBe('3');
+    expect(fake.sdk.Inbox.unreadCount).toHaveBeenCalledTimes(1);
+    fake.inbox({ type: 'read', itemId: 'in_1', unreadCount: 2 });
+    await nextTick();
+    expect(el.textContent).toBe('2');
+    app.unmount();
+    expect(fake.extraCounts().inbox).toBe(0);
+  });
+
+  it('useContentCards öğe bağlanıp SDK hazır olunca görünümü kurar, sökülünce kaldırır', async () => {
+    const options = { theme: 'dark' as const };
+    const { app, el } = mount(
+      defineComponent({
+        setup() {
+          const host = ref<HTMLElement | null>(null);
+          useContentCards(host, options);
+          return () => h('div', { ref: host, class: 'cards' });
+        },
+      }),
+    );
+    await flush();
+    await nextTick();
+    await flush();
+    expect(fake.sdk.ContentCards.render).toHaveBeenCalledTimes(1);
+    expect(fake.sdk.ContentCards.render).toHaveBeenCalledWith(el.querySelector('.cards'), options);
+    expect(fake.extraCounts().cardViews).toBe(1);
+    app.unmount();
+    expect(fake.extraCounts().cardViews).toBe(0);
+  });
+
+  it('useContentCards kurulum hatasını error alanına yazar', async () => {
+    fake.sdk.ContentCards.render.mockRejectedValueOnce(new Error('betik yüklenemedi'));
+    let error!: ReturnType<typeof useContentCards>['error'];
+    const { app } = mount(
+      defineComponent({
+        setup() {
+          const host = ref<HTMLElement | null>(null);
+          ({ error } = useContentCards(host));
+          return () => h('div', { ref: host });
+        },
+      }),
+    );
+    await flush();
+    await nextTick();
+    await flush();
+    expect(error.value?.message).toBe('betik yüklenemedi');
+    app.unmount();
+  });
+
+  it('usePushizoSearch yanıtı, hatayı ve tıklama kaydını yönetir; eski yanıt yenisinin üzerine yazmaz', async () => {
+    const scope = effectScope();
+    const api = scope.run(() => usePushizoSearch()) as UsePushizoSearch;
+    api.trackClick('https://example.test/doc');
+    expect(fake.sdk.Search.trackClick).not.toHaveBeenCalled();
+
+    await api.search('fiyat', { limit: 3 });
+    expect(fake.sdk.Search.query).toHaveBeenCalledWith('fiyat', { limit: 3 });
+    expect(api.response.value?.query_id).toBe('q_fiyat');
+    api.trackClick('https://example.test/doc', 1);
+    expect(fake.sdk.Search.trackClick).toHaveBeenCalledWith(
+      'q_fiyat',
+      'https://example.test/doc',
+      1,
+    );
+
+    let releaseSlow!: () => void;
+    fake.searchWith((text) =>
+      text === 'yavaş'
+        ? new Promise((resolve) => {
+            releaseSlow = () => resolve(searchResponse(text));
+          })
+        : Promise.resolve(searchResponse(text)),
+    );
+    const slow = api.search('yavaş');
+    await api.search('hızlı');
+    releaseSlow();
+    await slow;
+    expect(api.response.value?.query_id).toBe('q_hızlı');
+    expect(api.loading.value).toBe(false);
+
+    fake.searchWith(() => Promise.reject(new Error('arama kapalı')));
+    await api.search('hata');
+    expect(api.error.value?.message).toBe('arama kapalı');
+
+    await api.search('  ');
+    expect(api.response.value).toBeNull();
+    expect(api.error.value).toBeNull();
+    scope.stop();
   });
 
   it('eklenti kurulmadan usePushizo açıklayıcı hata verir; seçeneksiz kurulum reddedilir', () => {

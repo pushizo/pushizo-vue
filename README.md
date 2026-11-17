@@ -96,6 +96,12 @@ Options API: `this.$pushizo.User.addTags({ plan: 'pro' })`.
 | `PushizoPlugin` | `app.use(PushizoPlugin, options)` / `Vue.use(PushizoPlugin, options)`; `Pushizo.init` tarayıcıda bir kez. |
 | `usePushizo()` | `{ pushizo, state, ready, error, permission, pushSubscription }` (salt okunur ref/computed). |
 | `onNotificationClick(handler)` | Bildirim tıklaması dinleyicisi; kapsam bitince kaldırılır, dönen işlevle elle de kaldırılır. |
+| `onNotificationForeground(handler)` | Ön plan bildirimi dinleyicisi (`event.preventDefault()`); kapsam bitince `removeForegroundLifecycleListener` ile kaldırılır. |
+| `useFeatureFlag(key, defaultValue?)` | Özellik bayrağı açık mı (`ComputedRef<boolean>`); gözlemci kapsam bitince `FeatureFlags.removeObserver` ile temizlenir. |
+| `useFeatureFlagValue(key, defaultValue?)` | Bayrağın değeri (`ComputedRef`). |
+| `useInboxUnreadCount()` | Bildirim kutusu okunmamış sayısı (`Inbox.addObserver`); bilinmiyorsa `null`. |
+| `useContentCards(target, options?)` | Hazır içerik kartı akışını şablon başvurusundaki öğeye çizer (`ContentCards.render`); `{ error, refresh }`. |
+| `usePushizoSearch()` | Site araması durumu: `{ response, loading, error, search, trackClick, reset }` (`Search.query`). |
 | `$pushizo` | Paylaşılan SDK örneği (tüm bileşenlerde). |
 
 `init` hatası fırlatılmaz, `error` ref'ine yazılır. Vue 2.7'de uygulama düzeyinde söküm kancası olmadığından
